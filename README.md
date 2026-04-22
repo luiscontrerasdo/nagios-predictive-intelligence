@@ -134,25 +134,37 @@ In parallel, `msmtp` is configured system-wide as a relay so Nagios can also sen
 
 ### Setup on the server
 
-Edit `/opt/nagios_ml_sidecar/.env` with your SMTP credentials:
+SSH into `nagios-server` and edit the `.env` file:
 
 ```bash
+ssh root@<NAGIOS_SERVER_IP>
 nano /opt/nagios_ml_sidecar/.env
 ```
 
+Fill in your SMTP credentials:
+
 ```ini
-SMTP_HOST=your.smtp.server.com
-SMTP_PORT=587
-SMTP_USER=sender@yourdomain.com
-SMTP_PASS=your-smtp-password
-EMAIL_FROM=sender@yourdomain.com
-EMAIL_TO=recipient@yourdomain.com
+SMTP_HOST=your.smtp.server.com   # SMTP server hostname
+SMTP_PORT=587                    # 587 for STARTTLS (recommended)
+SMTP_USER=sender@yourdomain.com  # SMTP login username
+SMTP_PASS=your-smtp-password     # SMTP password or app password
+EMAIL_FROM=sender@yourdomain.com # Address shown as sender
+EMAIL_TO=you@example.com         # ← Address that receives the alerts
 ```
 
-Then restart the sidecar:
+**`EMAIL_TO` is the only field you need to change** if you want alerts delivered to a different inbox. You can set it to any valid email address.
+
+Save the file and restart the sidecar to apply the change:
 
 ```bash
 systemctl restart nagios-ml-sidecar
+```
+
+To confirm the new address is active:
+
+```bash
+journalctl -u nagios-ml-sidecar -n 5
+# Should show no errors on startup
 ```
 
 If `EMAIL_TO` is left empty the sidecar skips notifications silently and everything else keeps working normally.
