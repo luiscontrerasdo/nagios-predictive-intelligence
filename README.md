@@ -118,6 +118,48 @@ Then open both tabs you will need for the demo:
 
 ---
 
+## Email notifications
+
+The sidecar can send a predictive alert by email the moment the ML model first detects an upcoming breach, before Nagios fires. Each metric sends one email per scenario run, triggered by the first detection only.
+
+The email includes the metric name, current value, predicted breach time in minutes, critical threshold, and the exact time of detection.
+
+### What you need
+
+- An SMTP account (any provider works: Gmail, iPage, Outlook, etc.)
+- The SMTP server hostname and port (typically 587 with STARTTLS)
+- SMTP username and password
+- A sender address and a recipient address
+
+### Setup on the server
+
+Edit the `.env` file on `nagios-server` with your SMTP credentials:
+
+```bash
+nano /opt/nagios_ml_sidecar/.env
+```
+
+```ini
+SMTP_HOST=your.smtp.server.com
+SMTP_PORT=587
+SMTP_USER=sender@yourdomain.com
+SMTP_PASS=your-smtp-password
+EMAIL_FROM=sender@yourdomain.com
+EMAIL_TO=recipient@yourdomain.com
+```
+
+Then restart the sidecar to apply:
+
+```bash
+systemctl restart nagios-ml-sidecar
+```
+
+If `EMAIL_TO` is left empty, the sidecar skips notifications silently and everything else keeps working normally.
+
+> **Gmail users:** standard account passwords do not work with SMTP. You need to enable two-step verification and generate an App Password at `myaccount.google.com/apppasswords`. Use that as `SMTP_PASS`.
+
+---
+
 ## Running the demo
 
 Open the ML dashboard and the Nagios Web UI side by side so the audience can see both react in real time.
