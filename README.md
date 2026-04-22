@@ -120,20 +120,21 @@ Then open both tabs you will need for the demo:
 
 ## Email notifications
 
-The sidecar can send a predictive alert by email the moment the ML model first detects an upcoming breach, before Nagios fires. Each metric sends one email per scenario run, triggered by the first detection only.
+The sidecar sends a predictive alert by email the moment the ML model first detects an upcoming breach — before Nagios fires. Each metric triggers one email per scenario run, at the exact moment the prediction first appears on the dashboard.
 
-The email includes the metric name, current value, predicted breach time in minutes, critical threshold, and the exact time of detection.
+The email includes the metric name, current value, predicted minutes to breach, critical threshold, and the time of detection. It is sent via SMTP with STARTTLS directly from the sidecar using Python's `smtplib`, so it works independently of any system mail configuration.
+
+In parallel, `msmtp` is configured system-wide as a relay so Nagios can also send its own native notifications (CRITICAL, RECOVERY, etc.) through the same SMTP account.
 
 ### What you need
 
-- An SMTP account (any provider works: Gmail, iPage, Outlook, etc.)
-- The SMTP server hostname and port (typically 587 with STARTTLS)
-- SMTP username and password
+- An SMTP account with STARTTLS support on port 587 (Gmail, iPage, Outlook, and most providers work)
+- SMTP hostname, username, and password
 - A sender address and a recipient address
 
 ### Setup on the server
 
-Edit the `.env` file on `nagios-server` with your SMTP credentials:
+Edit `/opt/nagios_ml_sidecar/.env` with your SMTP credentials:
 
 ```bash
 nano /opt/nagios_ml_sidecar/.env
@@ -148,15 +149,26 @@ EMAIL_FROM=sender@yourdomain.com
 EMAIL_TO=recipient@yourdomain.com
 ```
 
-Then restart the sidecar to apply:
+Then restart the sidecar:
 
 ```bash
 systemctl restart nagios-ml-sidecar
 ```
 
-If `EMAIL_TO` is left empty, the sidecar skips notifications silently and everything else keeps working normally.
+If `EMAIL_TO` is left empty the sidecar skips notifications silently and everything else keeps working normally.
 
-> **Gmail users:** standard account passwords do not work with SMTP. You need to enable two-step verification and generate an App Password at `myaccount.google.com/apppasswords`. Use that as `SMTP_PASS`.
+> **Gmail users:** standard account passwords do not work with SMTP. Enable two-step verification and generate an App Password at `myaccount.google.com/apppasswords`. Use that as `SMTP_PASS`.
+
+### Verifying email delivery
+
+Check the sidecar logs for `[notifier]` lines after starting a degradation scenario:
+
+```bash
+journalctl -u nagios-ml-sidecar -f
+# Look for:  [notifier] alert sent → recipient@example.com (CPU breach in ~4 min)
+```
+
+If the email does not arrive, check your spam folder — the first email from a new domain often lands there.
 
 ---
 
