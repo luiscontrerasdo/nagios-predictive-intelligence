@@ -1,7 +1,7 @@
 # Nagios: From Reactive Alerts to Predictive Intelligence
 **Nagios World Conference 2026 — Live Demo**
 
-A conference session that transforms Nagios Core into a predictive monitoring platform using machine learning — with no changes to Nagios Core itself.
+A proof of concept that extends Nagios Core with a machine learning sidecar for predictive monitoring — no changes to Nagios Core itself.
 
 ---
 
@@ -10,7 +10,7 @@ A conference session that transforms Nagios Core into a predictive monitoring pl
 | What you see | How it works |
 |---|---|
 | Dashed cyan forecast line on each chart | Prophet (Meta) fits a trend model on the last 20 min of data |
-| "PREDICTED CRITICAL in Xmin" badge | Linear regression on last 10 data points detects slope |
+| "PREDICTED CRITICAL in Xmin" badge | Linear regression detects rising slope before threshold breach |
 | Red dots on the chart | Isolation Forest flags statistically anomalous readings |
 | Health Score gauge (0–100) | Weighted average: CPU×0.40 + Disk×0.30 + Network×0.30 |
 | Nagios UI reflecting live status | Passive check injection via external command pipe every 5s |
@@ -40,40 +40,7 @@ The ML prediction appears **~2 minutes** after clicking `[ START DEGRADATION ]`,
 └──────────────────────────────────────────────────────┘
 ```
 
-The sidecar writes a `PROCESS_SERVICE_CHECK_RESULT` command to the Nagios external command pipe every 5 seconds so the **Nagios Web UI always reflects the same simulated values** as the ML dashboard. Nagios services run with `active_checks_enabled 0` / `passive_checks_enabled 1` — the sidecar is the sole status source during the demo.
-
----
-
-## Project Structure
-
-```
-Nagios_2026_DEMO/
-├── ansible/
-│   ├── playbook.yml          # Full provisioning: Nagios Core + NRPE + ML sidecar
-│   ├── update_sidecar.yml    # Fast code update + Nagios config sync (~45s)
-│   └── reset.yml             # Full uninstall
-├── nagios_ml_sidecar/        # FastAPI ML sidecar
-│   ├── main.py               # App entrypoint, routes, WebSocket, broadcast loop
-│   ├── models/
-│   │   ├── forecaster.py     # Prophet (chart) + linear regression (breach_minutes)
-│   │   ├── anomaly.py        # Isolation Forest anomaly markers
-│   │   └── health_score.py   # Weighted 0–100 health gauge
-│   ├── data/
-│   │   └── simulator.py      # Baseline seed data + degradation value generator
-│   ├── templates/
-│   │   └── dashboard.html    # Dashboard UI (Jinja2 + Chart.js + WebSocket)
-│   ├── static/
-│   │   ├── dashboard.js      # Live chart updates, timeline canvas, services panel
-│   │   └── style.css         # Dark terminal theme
-│   └── requirements.txt
-├── diagrams/
-│   ├── architecture.png      # System diagram
-│   └── ml_pipeline.png       # ML data flow diagram
-├── scripts/
-│   └── generate_presentation.py  # Generates the 19-slide PPTX
-└── presentation/
-    └── Nagios_Predictive_2026.pptx
-```
+The sidecar writes a `PROCESS_SERVICE_CHECK_RESULT` command to the Nagios external command pipe every 5 seconds so the **Nagios Web UI always reflects the same simulated values** as the ML dashboard. Services run with `active_checks_enabled 0` / `passive_checks_enabled 1` — the sidecar is the sole status source during the demo.
 
 ---
 
