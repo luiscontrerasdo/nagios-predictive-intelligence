@@ -44,6 +44,116 @@ The sidecar writes a `PROCESS_SERVICE_CHECK_RESULT` command to the Nagios extern
 
 ---
 
+## Prerequisites
+
+### Host machine
+- macOS with **VMware Fusion** (or any hypervisor that supports host-only networking)
+- `brew`, `python3`, `ansible` installed on the host
+- `ansible.posix` collection: `ansible-galaxy collection install ansible.posix`
+
+### Virtual Machines (2)
+
+| VM | Role | Min RAM | Min Disk |
+|---|---|---|---|
+| `nagios-server` | Nagios Core + ML Sidecar | 2 GB | 20 GB |
+| `monitored-host` | NRPE agent (simulated target) | 1 GB | 10 GB |
+
+- OS: **Debian 12 (Bookworm)** — ARM64 or x86_64
+- Both VMs on the same host-only network, reachable from the host
+- SSH access as `root` to both VMs
+
+### Inventory configuration
+
+Edit `ansible/inventory.ini` with your VM IPs:
+
+```ini
+[nagios_server]
+nagios-server ansible_host=<NAGIOS_SERVER_IP>
+
+[monitored_host]
+monitored-host ansible_host=<MONITORED_HOST_IP>
+
+[all:vars]
+ansible_user=root
+ansible_ssh_pass=<YOUR_ROOT_PASSWORD>
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+```
+
+---
+
+## Deploy the Lab (~15–20 min)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/luiscontrerasdo/nagios-predictive-intelligence.git
+cd nagios-predictive-intelligence
+
+# 2. Verify both VMs are reachable
+ping -c1 <NAGIOS_SERVER_IP>
+ping -c1 <MONITORED_HOST_IP>
+
+# 3. Run the provisioner
+bash ansible/setup.sh
+```
+
+The provisioner installs on `nagios-server`:
+- Nagios Core 4.4.14 + Nagios Plugins 2.4.6
+- NRPE 4.1.0 (client)
+- Python 3.11 virtual environment
+- Prophet, CmdStan, scikit-learn, FastAPI
+- ML Sidecar as a systemd service (`nagios-ml-sidecar`)
+- Passive check configuration (external command pipe enabled)
+
+And on `monitored-host`:
+- Nagios Plugins 2.4.6
+- NRPE 4.1.0 daemon
+
+### Verify the install
+
+```bash
+# Health check
+curl http://<NAGIOS_SERVER_IP>:8000/api/health
+# Expected: {"status":"ok"}
+
+# Open the ML dashboard
+open http://<NAGIOS_SERVER_IP>:8000
+
+# Open the Nagios Web UI
+open http://<NAGIOS_SERVER_IP>/nagios
+```
+
+---
+
+## Running the Demo
+
+1. Open both tabs side by side: **ML dashboard** and **Nagios Web UI**
+2. Click **`[ START DEGRADATION ]`** on the dashboard
+3. Watch metrics rise every 5 seconds
+4. In ~2 minutes: blinking ⚠ badges appear — Nagios has not fired yet
+5. Nagios services transition WARNING → CRITICAL as thresholds are crossed
+6. Click **`[ RESET TO NORMAL ]`** to restore baseline
+
+### Demo Timing
+
+| Time | Event |
+|---|---|
+| 0:00 | Click START DEGRADATION |
+| ~1:00 | Charts rising, health score moves to YELLOW |
+| ~2:00 | "PREDICTED CRITICAL in Xmin" — Nagios still OK |
+| ~5:00 | Network breach — first Nagios CRITICAL |
+| ~6:00 | CPU breach |
+| ~9:00 | Disk breach |
+
+### Update code without reinstalling
+
+```bash
+cd ansible
+ansible-playbook -i inventory.ini update_sidecar.yml \
+  --extra-vars "project_dir=$(cd .. && pwd)"
+```
+
+---
+
 ## ML Models — Key Design Decisions
 
 ### Why two models for breach detection?
@@ -81,19 +191,6 @@ Every 5 seconds the sidecar evaluates each metric against warning/critical thres
 ```
 
 This keeps the Nagios UI synchronized with the ML dashboard without modifying Nagios Core.
-
----
-
-## Demo Timing
-
-| Time | Event |
-|---|---|
-| 0:00 | Click START DEGRADATION |
-| ~1:00 | Charts start rising, health score moves to YELLOW |
-| ~2:00 | "PREDICTED CRITICAL in Xmin" appears — Nagios has NOT fired yet |
-| ~5:00 | Network breach — first Nagios CRITICAL |
-| ~6:00 | CPU breach |
-| ~9:00 | Disk breach |
 
 ---
 
